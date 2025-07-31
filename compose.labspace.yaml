@@ -38,8 +38,7 @@ services:
       TESTCONTAINERS_HOST_OVERRIDE: localhost
     volumes:
       - socket-proxy:/var/run
-      # - project:/home/coder/project
-      - /Users/mikesir87/git/mikesir87/labspace-about-labspaces:/home/coder/project
+      - project:/home/coder/project
 
   host-republisher:
     image: michaelirwin244/labspace-host-port-republisher
