@@ -1,0 +1,13 @@
+title: About Labspaces
+description: >
+  This Labspace is intended to help you learn about the capabilities of Labspaces and how you can use them for your own training setups.
+
+sections:
+  - title: What is a Labspace?
+    contentPath: ./docs/01-what-is-a-labspace.md
+  - title: The Docker environment
+    contentPath: ./docs/02-the-docker-environment.md
+  - title: Mimicking the host network
+    contentPath: ./docs/03-networking.md
+  - title: Creating a Labspace
+    contentPath: ./docs/04-creating-a-labspace.md

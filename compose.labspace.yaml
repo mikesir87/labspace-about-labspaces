@@ -1,0 +1,121 @@
+services:
+  configurator:
+    image: michaelirwin244/labspace-configurator
+    pull_policy: always
+    volumes:
+      - project:/project
+    environment:
+      PROJECT_CLONE_URL: https://github.com/mikesir87/labspace-about-labspaces
+
+  interface:
+    image: michaelirwin244/labspace-interface
+    ports:
+      - "3030:3030"
+    volumes:
+      - project:/project
+    environment:
+      CONTENT_PATH: /project
+    depends_on:
+      workspace:
+        condition: service_started
+      configurator:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  workspace:
+    image: michaelirwin244/labspace-ide
+    pull_policy: always
+    command: /home/coder/project
+    depends_on:
+      configurator:
+        condition: service_completed_successfully
+      socket-proxy:
+        condition: service_started
+    ports:
+      - 8085:8085 # For the IDE itself
+      - 3000:3000 # For the application running in the IDE
+    environment:
+      TESTCONTAINERS_HOST_OVERRIDE: localhost
+    volumes:
+      - socket-proxy:/var/run
+      # - project:/home/coder/project
+      - /Users/mikesir87/git/mikesir87/labspace-about-labspaces:/home/coder/project
+
+  host-republisher:
+    image: michaelirwin244/labspace-host-port-republisher
+    pull_policy: always
+    volumes:
+      - socket-proxy:/var/run
+    network_mode: service:workspace
+    environment:
+      LABEL_FILTER: labspace-resource=true
+    depends_on:
+      - workspace
+      - socket-proxy
+
+  workspace-cleaner:
+    image: michaelirwin244/labspace-cleaner
+    pull_policy: always
+    volumes:
+      - socket-proxy:/var/run
+    environment:
+      LABEL_FILTER: labspace-resource=true
+    depends_on:
+      - socket-proxy
+
+  socket-proxy:
+    image: mikesir87/docker-socket-proxy
+    pull_policy: always
+    # image: socket-proxy
+    # use_api_socket: true
+    volumes:
+      - socket-proxy:/tmp/proxy
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      DEBUG_LOGS: "true"
+      CONFIG_DATA: |
+        mutators:
+          # Remap the project directory to the labspace content volume, since the project
+          # is running out of a volume.
+          - type: mountPath
+            from: /home/coder/project
+            to: labspace-content
+
+          # If requests to use the Docker Socket are used (such as Testcontainers),
+          # use the proxied one to ensure permissions, remappings, etc. are applied
+          - type: mountPath
+            from: /var/run/docker.sock
+            to: labspace-socket-proxy/docker.sock
+
+          # Add labels to all newly created objects
+          - type: addLabels
+            labels:
+              labspace-resource: "true"
+
+          - type: addToNetwork
+            networks:
+              - labspace
+        gates:
+          - type: mountSource
+            allowedSources:
+              - labspace-content
+              - labspace-socket-proxy
+              - buildx_buildkit_default_state
+
+        responseFilters:
+          # Only return objects with the labels we mutated on
+          - type: labelFilter
+            requiredLabels:
+              labspace-resource: "true"
+      LISTEN_SOCKET_PATH: /tmp/proxy/docker.sock
+
+volumes:
+  socket-proxy:
+    name: labspace-socket-proxy
+  project:
+    name: labspace-content
+
+networks:
+  default:
+    name: labspace
+
